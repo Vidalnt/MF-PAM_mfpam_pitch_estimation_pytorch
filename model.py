@@ -31,8 +31,10 @@ class Analysis_stage(nn.Module):
         floor=1e-3,
         pfactor=[17, 13, 11, 7, 5],
         npfactor=[0.2],
+        hop_size=160,
     ):
         super().__init__()
+        self.hop_size = hop_size
         self.chin = chin
         self.hidden = hidden
         self.kernel_size = kernel_size
@@ -105,22 +107,7 @@ class Analysis_stage(nn.Module):
             rescale_module(self, reference=rescale)
 
     def valid_length(self, length):
-        """
-        Return the nearest valid length to use with the model so that
-        there is no time steps left over in a convolutions, e.g. for all
-        layers, size of the input - kernel_size % stride = 0.
-
-        If the mixture has a valid length, the estimated sources
-        will have exactly the same length.
-        """
-        length = math.ceil(length * self.resample)
-        for idx in range(self.depth):
-            length = math.ceil((length - self.kernel_size) / self.stride) + 1
-            length = max(length, 1)
-        for idx in range(self.depth):
-            length = (length - 1) * self.stride + self.kernel_size
-        length = int(math.ceil(length / self.resample))
-        return int(length)
+        return int(math.ceil(length / self.hop_size) * self.hop_size)
 
     def forward(self, wav, condition=torch.tensor([1, 1])):
         if wav.dim() == 2:
