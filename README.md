@@ -4,37 +4,56 @@
 
 This repo is the official Pytorch implementation of ["MF-PAM: Accurate Pitch Estimation through Periodicity Analysis and Multi-level Feature Fusion"](https://arxiv.org/abs/2306.09640) accepted in INTERSPEECH 2023.
 
-
-In the paper we predicted the quantized f0 with BCELoss.
-
-However, you can also directly estimate the f0 value with L1 loss, which gives a more accurate VAD performance.
-You may use train_direct.py or model_direct.py for direct f0 estimation
+In the paper, we predicted the quantized F0 with **BCELoss**.  
+However, you can also directly estimate the F0 value with **L1 Loss**, which provides more accurate VAD performance. You may use `train_direct.py` or `model_direct.py` for direct F0 estimation.
 
 ## Dependencies
-```
+```bash
 pip install -r requirements.txt
 ```
 
-## Make json file for dataset
-Prepare for clean dataset and the corresponding noisy dataset
+## Dataset Preparation
+This implementation reads directly from a data directory. You no longer need to generate JSON files.
+
+### Folder Structure
+Your dataset should be organized as follows:
+```text
+data_path/
+├── train/
+│   ├── sample1.wav
+│   ├── sample1.pv
+│   ├── sample2.wav
+│   └── sample2.pv
+└── test/
+    ├── test_sample1.wav
+    └── test_sample1.pv
 ```
-python make_data_json.py path/to/clean/train/data/dir > json_save_dir/train/clean.json
-python make_data_json.py path/to/noisy/train/data/dir > json_save_dir/train/noisy.json
-python make_data_json.py path/to/clean/test/data/dir > json_save_dir/test/clean.json
-python make_data_json.py path/to/noisy/test/data/dir > json_save_dir/test/noisy.json
-```
+
+*   **`.wav` files**: Clean mono audio (16kHz recommended).
+*   **`.pv` files**: Text files containing the ground truth pitch in **Hz** (one value per frame).
+*   **Augmentation**: Noise and reverberation are added **on-the-fly** during training. You do not need to provide pre-mixed noisy files.
 
 ## Training
-```
-# Original code
-python train.py --checkpoint_path /path/to/save/checkpoint --data_json_path /path/to/data/json/directory --rir_dir /path/to/rir_list_saved/directory
+To start training, simply provide the path to the root data directory.
 
-# Directly estimating the F0 (preferred for better VAD performance)
-python train_direct.py --checkpoint_path /path/to/save/checkpoint --data_json_path /path/to/data/json/directory --rir_dir /path/to/rir_list_saved/directory
+### 1. Standard Quantized F0 (Paper Version)
+Uses 360 frequency bins and BCELoss.
+```bash
+python train.py --checkpoint_path /path/to/save/checkpoint --data_path /path/to/dataset/root --rir_dir /path/to/rir_list/
 ```
+
+### 2. Direct F0 Estimation
+Preferred for better VAD performance using L1 Loss.
+```bash
+python train_direct.py --checkpoint_path /path/to/save/checkpoint --data_path /path/to/dataset/root --rir_dir /path/to/rir_list/
+```
+
+### Arguments:
+*   `--data_path`: Path to the root folder containing `train/` and `test/` subfolders.
+*   `--rir_dir`: (Optional) Path to a directory containing Room Impulse Responses for reverberation augmentation.
 
 ## Publications
-```
+```bibtex
 @inproceedings{chung23_interspeech,
   author={Woo-Jin Chung and Doyeon Kim and Soo-Whan Chung and Hong-Goo Kang},
   title={{MF-PAM: Accurate Pitch Estimation through Periodicity Analysis and Multi-level Feature Fusion}},
