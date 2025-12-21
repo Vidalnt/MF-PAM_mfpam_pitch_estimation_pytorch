@@ -207,7 +207,7 @@ class Light_BiFPN(nn.Module):
 
         return p1, p2, p3, p4, p5
 
-    def forward(self, inputs):
+    def forward(self, inputs, target_frames):
         # The BiFPN illustration is an upside down form of the figure in the paper.
         """
         Illustration of a bifpn layer unit
@@ -225,8 +225,8 @@ class Light_BiFPN(nn.Module):
                                |------------ ---↓ |
             p1_in ---------------------------> p1_out -------->
         """
-        
-        p1_in, p2_in, p3_in, p4_in, p5_in = self.pre_resize(inputs)
+
+        p1_in, p2_in, p3_in, p4_in, p5_in = self.pre_resize(inputs, target_frames)
         # [B,48,500,1], [B,48,500,1], [B,48,500,1], [B,48,500,1], [B,48,500,1]
         
         # BiFPN operation
