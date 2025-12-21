@@ -3,6 +3,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
+
 def P_Conv(chin, chout, kernel_size, stride, snakefactor=5):
     """
     created by Woo-jin-Chung
@@ -14,8 +15,9 @@ def P_Conv(chin, chout, kernel_size, stride, snakefactor=5):
         nn.ReLU(),
         nn.Conv1d(chout, chout, 1),
         activation,
-        ]
+    ]
     return pconv
+
 
 def N_Conv(chin, chout, kernel_size, stride, snakefactor=0.2):
     """
@@ -28,8 +30,9 @@ def N_Conv(chin, chout, kernel_size, stride, snakefactor=0.2):
         nn.ReLU(),
         nn.Conv1d(chout, chout, 1),
         activation,
-        ]
+    ]
     return npconv
+
 
 def PNP_Conv_operation(wav, pconv, npconv):
     """
@@ -43,11 +46,14 @@ def PNP_Conv_operation(wav, pconv, npconv):
     wav = pwav + np_wav
     return wav
 
+
 class LSTM(nn.Module):
     def __init__(self, dim, layers=2, bi=False):
         super().__init__()
         klass = nn.LSTM
-        self.lstm = klass(bidirectional=bi, num_layers=layers, hidden_size=dim, input_size=dim)
+        self.lstm = klass(
+            bidirectional=bi, num_layers=layers, hidden_size=dim, input_size=dim
+        )
         self.linear = None
         if bi:
             self.linear = nn.Linear(2 * dim, dim)
@@ -58,18 +64,35 @@ class LSTM(nn.Module):
             x = self.linear(x)
         return x, hidden
 
+
 class SeparableConvBlock(nn.Module):
     """
     created by Zylo117
     """
-    def __init__(self, in_channels, out_channels=None, norm=True, activation=False, orig_swish=False):
+
+    def __init__(
+        self,
+        in_channels,
+        out_channels=None,
+        norm=True,
+        activation=False,
+        orig_swish=False,
+    ):
         super(SeparableConvBlock, self).__init__()
         if out_channels is None:
             out_channels = in_channels
 
-        self.depthwise_conv = Conv2dStaticSamePadding(in_channels, in_channels,
-                                                        kernel_size=5, stride=1, groups=in_channels, bias=False)
-        self.pointwise_conv = Conv2dStaticSamePadding(in_channels, out_channels, kernel_size=1, stride=1)
+        self.depthwise_conv = Conv2dStaticSamePadding(
+            in_channels,
+            in_channels,
+            kernel_size=5,
+            stride=1,
+            groups=in_channels,
+            bias=False,
+        )
+        self.pointwise_conv = Conv2dStaticSamePadding(
+            in_channels, out_channels, kernel_size=1, stride=1
+        )
 
         self.norm = norm
         if self.norm:
@@ -92,16 +115,33 @@ class SeparableConvBlock(nn.Module):
 
         return x
 
+
 class Conv2dStaticSamePadding(nn.Module):
     """
     created by Zylo117
     The real keras/tensorflow conv2d with same padding
     """
 
-    def __init__(self, in_channels, out_channels, kernel_size, stride=1, bias=True, groups=1, dilation=1, **kwargs):
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        kernel_size,
+        stride=1,
+        bias=True,
+        groups=1,
+        dilation=1,
+        **kwargs
+    ):
         super().__init__()
-        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride=stride,
-                              bias=bias, groups=groups)
+        self.conv = nn.Conv2d(
+            in_channels,
+            out_channels,
+            kernel_size,
+            stride=stride,
+            bias=bias,
+            groups=groups,
+        )
         self.stride = self.conv.stride
         self.kernel_size = self.conv.kernel_size
         self.dilation = self.conv.dilation
@@ -118,10 +158,18 @@ class Conv2dStaticSamePadding(nn.Module):
 
     def forward(self, x):
         h, w = x.shape[-2:]
-        
-        extra_h = (math.ceil(w / self.stride[1]) - 1) * self.stride[1] - w + self.kernel_size[1]
-        extra_v = (math.ceil(h / self.stride[0]) - 1) * self.stride[0] - h + self.kernel_size[0]
-        
+
+        extra_h = (
+            (math.ceil(w / self.stride[1]) - 1) * self.stride[1]
+            - w
+            + self.kernel_size[1]
+        )
+        extra_v = (
+            (math.ceil(h / self.stride[0]) - 1) * self.stride[0]
+            - h
+            + self.kernel_size[0]
+        )
+
         left = extra_h // 2
         right = extra_h - left
         top = extra_v // 2
@@ -131,6 +179,7 @@ class Conv2dStaticSamePadding(nn.Module):
 
         x = self.conv(x)
         return x
+
 
 class MaxPool2dStaticSamePadding(nn.Module):
     """
@@ -156,9 +205,17 @@ class MaxPool2dStaticSamePadding(nn.Module):
 
     def forward(self, x):
         h, w = x.shape[-2:]
-        
-        extra_h = (math.ceil(w / self.stride[1]) - 1) * self.stride[1] - w + self.kernel_size[1]
-        extra_v = (math.ceil(h / self.stride[0]) - 1) * self.stride[0] - h + self.kernel_size[0]
+
+        extra_h = (
+            (math.ceil(w / self.stride[1]) - 1) * self.stride[1]
+            - w
+            + self.kernel_size[1]
+        )
+        extra_v = (
+            (math.ceil(h / self.stride[0]) - 1) * self.stride[0]
+            - h
+            + self.kernel_size[0]
+        )
 
         left = extra_h // 2
         right = extra_h - left
@@ -169,7 +226,8 @@ class MaxPool2dStaticSamePadding(nn.Module):
 
         x = self.pool(x)
         return x
-    
+
+
 class AvgPool2dStaticSamePadding(nn.Module):
     """
     created by Zylo117
@@ -194,9 +252,17 @@ class AvgPool2dStaticSamePadding(nn.Module):
 
     def forward(self, x):
         h, w = x.shape[-2:]
-        
-        extra_h = (math.ceil(w / self.stride[1]) - 1) * self.stride[1] - w + self.kernel_size[1]
-        extra_v = (math.ceil(h / self.stride[0]) - 1) * self.stride[0] - h + self.kernel_size[0]
+
+        extra_h = (
+            (math.ceil(w / self.stride[1]) - 1) * self.stride[1]
+            - w
+            + self.kernel_size[1]
+        )
+        extra_v = (
+            (math.ceil(h / self.stride[0]) - 1) * self.stride[0]
+            - h
+            + self.kernel_size[0]
+        )
 
         left = extra_h // 2
         right = extra_h - left
@@ -207,6 +273,7 @@ class AvgPool2dStaticSamePadding(nn.Module):
 
         x = self.pool(x)
         return x
+
 
 class SwishImplementation(torch.autograd.Function):
     @staticmethod
@@ -226,27 +293,32 @@ class MemoryEfficientSwish(nn.Module):
     def forward(self, x):
         return SwishImplementation.apply(x)
 
+
 class Swish(nn.Module):
     def forward(self, x):
         return x * torch.sigmoid(x)
+
 
 class Snake(nn.Module):
     def __init__(self, a=5):
         super(Snake, self).__init__()
         self.a = a
+
     def forward(self, x):
-        return (x + (torch.sin(self.a * x) ** 2) / self.a)
+        return x + (torch.sin(self.a * x) ** 2) / self.a
+
 
 def sinc(t):
     """sinc.
     :param t: the input tensor
     """
-    return torch.where(t == 0, torch.tensor(1., device=t.device, dtype=t.dtype), torch.sin(t) / t)
+    return torch.where(
+        t == 0, torch.tensor(1.0, device=t.device, dtype=t.dtype), torch.sin(t) / t
+    )
 
 
 def kernel_upsample2(zeros=56):
-    """kernel_upsample2.
-    """
+    """kernel_upsample2."""
     win = torch.hann_window(4 * zeros + 1, periodic=False)
     winodd = win[1::2]
     t = torch.linspace(-zeros + 0.5, zeros - 0.5, 2 * zeros)
@@ -264,18 +336,22 @@ def upsample2(x, zeros=56):
     """
     *other, time = x.shape
     kernel = kernel_upsample2(zeros).to(x)
-    out = F.conv1d(x.view(-1, 1, time), kernel, padding=zeros)[..., 1:].view(*other, time)
+    out = F.conv1d(x.view(-1, 1, time), kernel, padding=zeros)[..., 1:].view(
+        *other, time
+    )
     y = torch.stack([x, out], dim=-1)
     return y.view(*other, -1)
 
+
 def rescale_conv(conv, reference):
     std = conv.weight.std().detach()
-    scale = (std / reference)**0.5
+    scale = (std / reference) ** 0.5
     conv.weight.data /= scale
     if conv.bias is not None:
         conv.bias.data /= scale
 
+
 def rescale_module(module, reference):
     for sub in module.modules():
         if isinstance(sub, (nn.Conv1d, nn.ConvTranspose1d)):
-            rescale_conv(sub, reference)    
+            rescale_conv(sub, reference)

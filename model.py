@@ -3,15 +3,35 @@ import torch.nn.functional as F
 import torch.nn as nn
 import math
 from utils import capture_init
-from module import upsample2, P_Conv, N_Conv, PNP_Conv_operation, rescale_module,\
-                    LSTM, SeparableConvBlock, MemoryEfficientSwish, Swish
-import pdb
+from module import (
+    upsample2,
+    P_Conv,
+    N_Conv,
+    PNP_Conv_operation,
+    rescale_module,
+    LSTM,
+    SeparableConvBlock,
+    MemoryEfficientSwish,
+    Swish,
+)
 
 
 class Analysis_stage(nn.Module):
     @capture_init
-    def __init__(self, chin=1, hidden=6, kernel_size=4, stride=4, resample=4, depth=5,
-                normalize=True, rescale=0.1, floor=1e-3, pfactor = [17, 13, 11, 7, 5], npfactor = [0.2]):
+    def __init__(
+        self,
+        chin=1,
+        hidden=6,
+        kernel_size=4,
+        stride=4,
+        resample=4,
+        depth=5,
+        normalize=True,
+        rescale=0.1,
+        floor=1e-3,
+        pfactor=[17, 13, 11, 7, 5],
+        npfactor=[0.2],
+    ):
         super().__init__()
         self.chin = chin
         self.hidden = hidden
@@ -28,19 +48,49 @@ class Analysis_stage(nn.Module):
         self.p_conv2 = nn.ModuleList()
         self.np_conv2 = nn.ModuleList()
         self.p_convs = nn.ModuleList()
-        
+
         # PNP-Conv1
-        pconv1 = P_Conv(self.chin, self.hidden, self.kernel_size, self.stride, self.pfactor[0])
-        npconv1 = N_Conv(self.chin, self.hidden, self.kernel_size, self.stride, self.npfactor[0])
-        
+        pconv1 = P_Conv(
+            self.chin, self.hidden, self.kernel_size, self.stride, self.pfactor[0]
+        )
+        npconv1 = N_Conv(
+            self.chin, self.hidden, self.kernel_size, self.stride, self.npfactor[0]
+        )
+
         # PNP-Conv2
-        pconv2 = P_Conv(self.hidden, self.hidden*2, self.kernel_size, self.stride, self.pfactor[1])
-        npconv2 = N_Conv(self.hidden, self.hidden*2, self.kernel_size, self.stride, self.npfactor[0])
-        
+        pconv2 = P_Conv(
+            self.hidden, self.hidden * 2, self.kernel_size, self.stride, self.pfactor[1]
+        )
+        npconv2 = N_Conv(
+            self.hidden,
+            self.hidden * 2,
+            self.kernel_size,
+            self.stride,
+            self.npfactor[0],
+        )
+
         # P-Conv3, 4, 5
-        pconv3 = P_Conv(self.hidden*2, self.hidden*4, self.kernel_size*2, self.stride, self.pfactor[2])
-        pconv4 = P_Conv(self.hidden*4, self.hidden*8, self.kernel_size*2, self.stride, self.pfactor[3])
-        pconv5 = P_Conv(self.hidden*8, self.hidden*16, self.kernel_size*3, self.stride, self.pfactor[4])
+        pconv3 = P_Conv(
+            self.hidden * 2,
+            self.hidden * 4,
+            self.kernel_size * 2,
+            self.stride,
+            self.pfactor[2],
+        )
+        pconv4 = P_Conv(
+            self.hidden * 4,
+            self.hidden * 8,
+            self.kernel_size * 2,
+            self.stride,
+            self.pfactor[3],
+        )
+        pconv5 = P_Conv(
+            self.hidden * 8,
+            self.hidden * 16,
+            self.kernel_size * 3,
+            self.stride,
+            self.pfactor[4],
+        )
 
         self.p_conv1.append(nn.Sequential(*pconv1))
         self.np_conv1.append(nn.Sequential(*npconv1))
@@ -49,8 +99,8 @@ class Analysis_stage(nn.Module):
         self.p_convs.append(nn.Sequential(*pconv3))
         self.p_convs.append(nn.Sequential(*pconv4))
         self.p_convs.append(nn.Sequential(*pconv5))
-        self.lstm = LSTM(hidden*16, bi=False)
-        
+        self.lstm = LSTM(hidden * 16, bi=False)
+
         if rescale:
             rescale_module(self, reference=rescale)
 
@@ -81,29 +131,29 @@ class Analysis_stage(nn.Module):
             wav = wav / (self.floor + std)
         else:
             std = 1
-            
+
         length = wav.shape[-1]
         x = wav
         x = F.pad(x, (0, self.valid_length(length) - length))
-        
+
         x = upsample2(x)
         x = upsample2(x)
 
         multi_feat = []
-        
+
         x = PNP_Conv_operation(x, self.p_conv1, self.np_conv1)
         x = PNP_Conv_operation(x, self.p_conv2, self.np_conv2)
         multi_feat.append(x)
-        
+
         for p in self.p_convs:
             x = p(x)
             multi_feat.append(x)
-            
-        x = x. permute(2,0,1)
+
+        x = x.permute(2, 0, 1)
         x, _ = self.lstm(x)
-        x = x.permute(1,2,0)
+        x = x.permute(1, 2, 0)
         multi_feat.append(x)
-        
+
         return multi_feat
 
 
@@ -148,19 +198,20 @@ class Light_BiFPN(nn.Module):
     created by Zylo117
     modified by Woo-jin-Chung
     """
+
     def __init__(self, num_channels, epsilon=1e-8, orig_swish=False):
         super(Light_BiFPN, self).__init__()
 
         self.epsilon = epsilon
-        
-        # Pre resize
-        self.p1_upch = SeparableConvBlock(num_channels//4, num_channels)
-        self.p2_upch = SeparableConvBlock(num_channels//2, num_channels)
-        self.p4_dnch = SeparableConvBlock(num_channels*2, num_channels)
-        self.p5_dnch = SeparableConvBlock(num_channels*2, num_channels)
 
-        self.p4_upsample = nn.Upsample(scale_factor=(2,1), mode='nearest')
-        self.p5_upsample = nn.Upsample(scale_factor=(2,1), mode='nearest')
+        # Pre resize
+        self.p1_upch = SeparableConvBlock(num_channels // 4, num_channels)
+        self.p2_upch = SeparableConvBlock(num_channels // 2, num_channels)
+        self.p4_dnch = SeparableConvBlock(num_channels * 2, num_channels)
+        self.p5_dnch = SeparableConvBlock(num_channels * 2, num_channels)
+
+        self.p4_upsample = nn.Upsample(scale_factor=(2, 1), mode="nearest")
+        self.p5_upsample = nn.Upsample(scale_factor=(2, 1), mode="nearest")
 
         # BiFPN conv layers
         self.conv6_up = SeparableConvBlock(num_channels, orig_swish=orig_swish)
@@ -171,27 +222,42 @@ class Light_BiFPN(nn.Module):
         self.conv5_down = SeparableConvBlock(num_channels, orig_swish=orig_swish)
         self.conv6_down = SeparableConvBlock(num_channels, orig_swish=orig_swish)
         self.conv7_down = SeparableConvBlock(num_channels, orig_swish=orig_swish)
-    
 
         self.swish = MemoryEfficientSwish() if not orig_swish else Swish()
 
         # Weight
-        self.p4_w1 = nn.Parameter(torch.ones(2, dtype=torch.float32), requires_grad=True)
+        self.p4_w1 = nn.Parameter(
+            torch.ones(2, dtype=torch.float32), requires_grad=True
+        )
         self.p4_w1_relu = nn.ReLU()
-        self.p3_w1 = nn.Parameter(torch.ones(2, dtype=torch.float32), requires_grad=True)
+        self.p3_w1 = nn.Parameter(
+            torch.ones(2, dtype=torch.float32), requires_grad=True
+        )
         self.p3_w1_relu = nn.ReLU()
-        self.p2_w1 = nn.Parameter(torch.ones(2, dtype=torch.float32), requires_grad=True)
+        self.p2_w1 = nn.Parameter(
+            torch.ones(2, dtype=torch.float32), requires_grad=True
+        )
         self.p2_w1_relu = nn.ReLU()
-        self.p1_w1 = nn.Parameter(torch.ones(2, dtype=torch.float32), requires_grad=True)
+        self.p1_w1 = nn.Parameter(
+            torch.ones(2, dtype=torch.float32), requires_grad=True
+        )
         self.p1_w1_relu = nn.ReLU()
 
-        self.p2_w2 = nn.Parameter(torch.ones(3, dtype=torch.float32), requires_grad=True)
+        self.p2_w2 = nn.Parameter(
+            torch.ones(3, dtype=torch.float32), requires_grad=True
+        )
         self.p2_w2_relu = nn.ReLU()
-        self.p3_w2 = nn.Parameter(torch.ones(3, dtype=torch.float32), requires_grad=True)
+        self.p3_w2 = nn.Parameter(
+            torch.ones(3, dtype=torch.float32), requires_grad=True
+        )
         self.p3_w2_relu = nn.ReLU()
-        self.p4_w2 = nn.Parameter(torch.ones(3, dtype=torch.float32), requires_grad=True)
+        self.p4_w2 = nn.Parameter(
+            torch.ones(3, dtype=torch.float32), requires_grad=True
+        )
         self.p4_w2_relu = nn.ReLU()
-        self.p5_w2 = nn.Parameter(torch.ones(2, dtype=torch.float32), requires_grad=True)
+        self.p5_w2 = nn.Parameter(
+            torch.ones(2, dtype=torch.float32), requires_grad=True
+        )
         self.p5_w2_relu = nn.ReLU()
 
     def pre_resize(self, inputs, target_frames):
@@ -228,7 +294,7 @@ class Light_BiFPN(nn.Module):
 
         p1_in, p2_in, p3_in, p4_in, p5_in = self.pre_resize(inputs, target_frames)
         # [B,48,500,1], [B,48,500,1], [B,48,500,1], [B,48,500,1], [B,48,500,1]
-        
+
         # BiFPN operation
         ## Top-bottom process
         # Weights for p4_in and p5_in to p4_mid
@@ -260,19 +326,25 @@ class Light_BiFPN(nn.Module):
         p2_w2 = self.p2_w2_relu(self.p2_w2)
         weight = p2_w2 / (torch.sum(p2_w2, dim=0) + self.epsilon)
         # Connections for p2_in, p2_mid and p1_out to p2_out respectively
-        p2_out = self.conv4_down(self.swish(weight[0] * p2_in + weight[1] * p2_mid + weight[2] * (p1_out)))
+        p2_out = self.conv4_down(
+            self.swish(weight[0] * p2_in + weight[1] * p2_mid + weight[2] * (p1_out))
+        )
 
         # Weights for p3_in, p3_mid and p2_out to p3_out
         p3_w2 = self.p3_w2_relu(self.p3_w2)
         weight = p3_w2 / (torch.sum(p3_w2, dim=0) + self.epsilon)
         # Connections for p3_in, p3_mid and p2_out to p3_out respectively
-        p3_out = self.conv5_down(self.swish(weight[0] * p3_in + weight[1] * p3_mid + weight[2] * (p2_out)))
+        p3_out = self.conv5_down(
+            self.swish(weight[0] * p3_in + weight[1] * p3_mid + weight[2] * (p2_out))
+        )
 
         # Weights for p4_in, p4_mid and p3_out to p4_out
         p4_w2 = self.p4_w2_relu(self.p4_w2)
         weight = p4_w2 / (torch.sum(p4_w2, dim=0) + self.epsilon)
         # Connections for p4_in, p4_mid and p3_out to p4_out respectively
-        p4_out = self.conv6_down(self.swish(weight[0] * p4_in + weight[1] * p4_mid + weight[2] * (p3_out)))
+        p4_out = self.conv6_down(
+            self.swish(weight[0] * p4_in + weight[1] * p4_mid + weight[2] * (p3_out))
+        )
 
         # Weights for p5_in and p4_out to p5_out
         p5_w2 = self.p5_w2_relu(self.p5_w2)
@@ -281,5 +353,3 @@ class Light_BiFPN(nn.Module):
         p5_out = self.conv7_down(self.swish(weight[0] * p5_in + weight[1] * (p4_out)))
 
         return p1_out, p2_out, p3_out, p4_out, p5_out
-
-

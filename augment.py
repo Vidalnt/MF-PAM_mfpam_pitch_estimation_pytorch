@@ -8,6 +8,7 @@
 import torch
 from torch import nn
 
+
 class Remix(nn.Module):
     """Remix.
     Mixes different noises with clean speech within a given batch
@@ -43,7 +44,9 @@ class Shift(nn.Module):
             else:
                 offsets = torch.randint(
                     self.shift,
-                    [1 if self.same else sources, batch, 1, 1], device=wav.device)
+                    [1 if self.same else sources, batch, 1, 1],
+                    device=wav.device,
+                )
                 offsets = offsets.expand(sources, -1, channels, -1)
                 indexes = torch.arange(length, device=wav.device)
                 wav = wav.gather(3, indexes + offsets)

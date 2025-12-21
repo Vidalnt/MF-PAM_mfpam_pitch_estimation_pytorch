@@ -2,6 +2,7 @@ import glob
 import os
 import matplotlib
 import torch
+
 matplotlib.use("Agg")
 import matplotlib.pylab as plt
 import numpy as np
@@ -14,8 +15,10 @@ def plot_f0_compared(f0, cleanf0):
     fig, ax = plt.subplots(figsize=(10, 5))
     plt.plot(f0, label="hat")
     plt.plot(cleanf0, label="gt")
-    plt.ylim(0,)
-    plt.xlim(0,500)
+    plt.ylim(
+        0,
+    )
+    plt.xlim(0, 500)
     plt.legend()
     fig.canvas.draw()
     plt.close()
@@ -37,7 +40,7 @@ def save_checkpoint(filepath, obj):
 
 
 def scan_checkpoint(cp_dir, prefix):
-    pattern = os.path.join(cp_dir, prefix + '????????')
+    pattern = os.path.join(cp_dir, prefix + "????????")
     cp_list = glob.glob(pattern)
     if len(cp_list) == 0:
         return None
@@ -50,6 +53,7 @@ def capture_init(init):
     Decorate `__init__` with this, and you can then
     recover the *args and **kwargs passed to it in `self._init_args_kwargs`
     """
+
     @functools.wraps(init)
     def __init__(self, *args, **kwargs):
         self._init_args_kwargs = (args, kwargs)
