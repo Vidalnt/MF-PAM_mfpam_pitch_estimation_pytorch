@@ -14,7 +14,11 @@ import colorednoise as cn
 
 def hz_to_onehot(hz, freq_bins=360, bins_per_octave=48):
     fmin = 32.7
-    hz = torch.tensor(hz)
+    # Fix UserWarning for torch.tensor
+    if isinstance(hz, torch.Tensor):
+        hz = hz.clone().detach()
+    else:
+        hz = torch.tensor(hz)
     indexs = (
         torch.log((hz + 0.0000001) / fmin) / np.log(2.0 ** (1.0 / bins_per_octave))
         + 0.5
@@ -62,6 +66,8 @@ class Audioset:
             out, sr = torchaudio.load(
                 str(file), frame_offset=offset, num_frames=num_frames
             )
+            if out.shape[0] > 1:
+                out = torch.mean(out, dim=0, keepdim=True)
             if num_frames > 0 and out.shape[-1] < num_frames:
                 out = F.pad(out, (0, num_frames - out.shape[-1]))
             return out, file, offset
