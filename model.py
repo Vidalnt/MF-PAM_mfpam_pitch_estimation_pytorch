@@ -108,32 +108,33 @@ class Analysis_stage(nn.Module):
 
 
 class Estimation_stage(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, hop_size=160):
         super().__init__()
         num_channels = 48
+        self.hop_size = hop_size
         self.a_stage = Analysis_stage()
         self.light_bifpn = Light_BiFPN(num_channels=num_channels)
-        self.ln = (nn.Linear(in_features=240, out_features=360))
+        self.ln = nn.Linear(in_features=240, out_features=360)
 
-    def forward(self, input):        
+    def forward(self, input):
+        target_frames = input.shape[-1] // self.hop_size
         p1, p2, p3, p4, p5 = self.a_stage(input)
         # [B,12,16020], [B,24,4004], [B,48,1000], [B,96,249], [B,96,249]
-        
-        p1 = p1[:,:,:,None]
-        p2 = p2[:,:,:,None]
-        p3 = p3[:,:,:,None]
-        p4 = p4[:,:,:,None]
-        p5 = p5[:,:,:,None]
+
+        p1 = p1[:, :, :, None]
+        p2 = p2[:, :, :, None]
+        p3 = p3[:, :, :, None]
+        p4 = p4[:, :, :, None]
+        p5 = p5[:, :, :, None]
 
         features = (p1, p2, p3, p4, p5)
-        f0_features = self.light_bifpn(features)
+        f0_features = self.light_bifpn(features, target_frames)
         " 500 = frame number while the input_length is 4sec & hop_lenghth is 128 & sampling rate is 16 kHz"
         # [B,48,500,1], [B,48,500,1], [B,48,500,1], [B,48,500,1], [B,48,500,1]
-        
 
         f0_feature = torch.cat(f0_features, dim=1)
         # f0_feature: [B, 48*5=240, 500, 1]
-        f0_feature = f0_feature.permute(0,2,1,3).squeeze(3)
+        f0_feature = f0_feature.permute(0, 2, 1, 3).squeeze(3)
         # f0_feature: [B, 500, 240]
         f0out = self.ln(f0_feature)
         # [B, 500, 360]
@@ -193,23 +194,18 @@ class Light_BiFPN(nn.Module):
         self.p5_w2 = nn.Parameter(torch.ones(2, dtype=torch.float32), requires_grad=True)
         self.p5_w2_relu = nn.ReLU()
 
-    def pre_resize(self, inputs):
+    def pre_resize(self, inputs, target_frames):
         # [B,12,16020], [B,24,4004], [B,48,1000], [B,96,249], [B,96,249]
         p1, p2, p3, p4, p5 = inputs
-        
+
         # Pre resizing
-        p1 = self.p1_upch(F.avg_pool2d(p1, (32,1)))
-        # f1: [B,48,500,1]
-        p2 = F.pad(self.p2_upch(F.avg_pool2d(p2, (8,1))), (0,0,1,0))
-        # f2: [B,48,500,1]
-        p3 = F.pad(F.avg_pool2d(p3, (2,1)), (0,0,1,0))
-        # f3: [B,48,500,1]
-        p4 = self.p4_dnch(self.p4_upsample(F.pad(p4,(0,0,2,1))))
-        # f4: [B,48,500,1]
-        p5 = self.p5_dnch(self.p5_upsample(F.pad(p5,(0,0,2,1))))
-        # f5: [B,48,500,1]
+        p1 = self.p1_upch(F.adaptive_avg_pool2d(p1, (target_frames, 1)))
+        p2 = self.p2_upch(F.adaptive_avg_pool2d(p2, (target_frames, 1)))
+        p3 = F.adaptive_avg_pool2d(p3, (target_frames, 1))
+        p4 = self.p4_dnch(F.adaptive_avg_pool2d(p4, (target_frames, 1)))
+        p5 = self.p5_dnch(F.adaptive_avg_pool2d(p5, (target_frames, 1)))
+
         return p1, p2, p3, p4, p5
-        
 
     def forward(self, inputs):
         # The BiFPN illustration is an upside down form of the figure in the paper.
