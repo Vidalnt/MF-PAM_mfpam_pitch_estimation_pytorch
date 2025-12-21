@@ -42,7 +42,7 @@ def train(rank, a, h):
     torch.cuda.manual_seed(h.seed)
     device = torch.device("cuda:{:d}".format(rank))
 
-    estimator = Estimation_stage().to(device)
+    estimator = Estimation_stage(hop_size=h.hop_size).to(device)
 
     if rank == 0:
         print(estimator)
