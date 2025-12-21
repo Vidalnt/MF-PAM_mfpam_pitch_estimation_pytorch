@@ -6,11 +6,8 @@
     "adam_b2": 0.999,
     "lr_decay": 0.999,
     "seed": 1234,
-
-    "hop_size": 128,
-
+    "hop_size": 160,
     "sampling_rate": 16000,
     "max_wav_value": 32768.0,
-
     "num_workers": 4
 }
